@@ -1,38 +1,33 @@
-from flask import Flask, request, send_from_directory, abort
+from flask import Flask, request, render_template_string
 import os
 
 app = Flask(__name__)
 
-# Directory where files are stored
-FILE_DIRECTORY = './files'
-
 @app.route('/')
-def index():
-    # HTML for displaying links
-    links = [
-        'file1.txt',
-        'file2.txt',
-        'file3.txt'
-    ]
+def home():
+    return '''
+        <h1>Welcome to the vulnerable Flask app!</h1>
+        <form action="/view" method="get">
+            <label for="filename">Enter filename:</label>
+            <input type="text" id="filename" name="filename">
+            <input type="submit" value="View File">
+        </form>
+    '''
+
+@app.route('/view')
+def view_file():
+    filename = request.args.get('filename')
     
-    html = "<p>Welcome to my journal app!</p>"
-    for link in links:
-        html += f'<p><a href="/{link}">{link}</a></p>'
-    
-    return html
+    # Vulnerable code: directly using user input to read files
+    try:
+        with open(os.path.join('files', filename), 'r') as f:
+            file_content = f.read()
+    except FileNotFoundError:
+        return f"<h1>File not found: {filename}</h1>"
+    except Exception as e:
+        return f"<h1>Error: {str(e)}</h1>"
 
-@app.route('/<path:filename>')
-def serve_file(filename):
-    # Prevent directory traversal
-    if '..' in filename or filename.startswith('/'):
-        abort(404, description="Invalid file!")
-
-    file_path = os.path.join(FILE_DIRECTORY, filename)
-
-    if os.path.isfile(file_path):
-        return send_from_directory(FILE_DIRECTORY, filename)
-    else:
-        return "File not found!", 404
+    return render_template_string("<pre>{{ content }}</pre>", content=file_content)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True)
